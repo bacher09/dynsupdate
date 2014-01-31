@@ -17,7 +17,7 @@ class DetectIpTests(TestCase):
         self.assertTrue(len(set(services_ips.values())) == 1,
             "Some service return bad result {0}".format(str(services_ips)))
 
-    @mock.patch('urllib2.urlopen')
+    @mock.patch('dynsupdate.client.urlopen', spec=client.urlopen)
     def test_services(self, urlopen_mock):
         def fake_urlopen(url, *args, **kwargs):
             return StringIO("127.0.0.1\n")

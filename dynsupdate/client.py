@@ -1,7 +1,20 @@
 import re
-import urllib2
 import socket
 import contextlib
+import sys
+
+
+PY2 = sys.version_info[0] == 2
+PY3 = sys.version_info[0] == 3
+
+
+if PY2:
+    from urllib2 import urlopen, URLError
+else:
+    from urllib.request import urlopen
+    from urllib.error import URLError
+
+
 
 
 MAX_RESPONSE_DATA = 8192
@@ -34,10 +47,10 @@ HTTP_IP_SERVICES = (
 
 def simple_ip_fetch(url, extract_fun=lambda x: x.strip(), timeout=5):
     try:
-        with contextlib.closing(urllib2.urlopen(url, timeout=timeout)) as resp:
+        with contextlib.closing(urlopen(url, timeout=timeout)) as resp:
             # Limit response size
             data = resp.read(MAX_RESPONSE_DATA)
-    except (urllib2.URLError, socket.error) as e:
+    except (URLError, socket.error) as e:
         return None
     else:
         return extract_fun(data)
