@@ -109,3 +109,51 @@ def build_resolver(server):
         new_resolver = dns.resolver.Resolver(configure=False)
         new_resolver.nameservers.append(rdata.address)
         return new_resolver
+
+
+class BadToken(Exception):
+    pass
+
+
+class KeyConfig(object):
+
+    WHITE_SPACE_RE = re.compile("\s+")
+    KEYWORD_RE = re.compile("[a-z]+[a-z\d\-]*[a-z\d]+", re.I)
+    STRING_RE = re.compile('"([^"]*)"')
+    BLOCK_BEGIN_RE = re.compile('{')
+    BLOCK_END_RE = re.compile('}')
+    END_COMMAND_RE = re.compile(';');
+
+    class Tokens(object):
+        SPACE = 0
+        KEYWORD = 1
+        STRING = 2
+        BLOCK_BEGIN = 3
+        BLOCK_END = 4
+        END_COMMAND = 5
+
+    TOKENS_DATA = (
+        (WHITE_SPACE_RE, Tokens.SPACE),
+        (KEYWORD_RE, Tokens.KEYWORD),
+        (STRING_RE, Tokens.STRING),
+        (BLOCK_BEGIN_RE, Tokens.BLOCK_BEGIN),
+        (BLOCK_END_RE, Tokens.BLOCK_END),
+        (END_COMMAND_RE, Tokens.END_COMMAND)
+    )
+
+    @classmethod
+    def get_current_token(cls, data, start_pos=0):
+        for token_re, token_id in cls.TOKENS_DATA:
+            m = token_re.match(data, start_pos)
+            if m is not None:
+                return (m, token_id)
+
+        raise BadToken("Unknown token")
+
+    @classmethod
+    def tokenize(cls, data):
+        pos, l = 0, len(data)
+        while pos < l:
+            m, token_id = cls.get_current_token(data, pos)
+            yield (m, token_id)
+            pos = m.end()
