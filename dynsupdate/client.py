@@ -18,8 +18,6 @@ else:
     from urllib.error import URLError
 
 
-
-
 MAX_RESPONSE_DATA = 8192
 # TODO: Support IPv6 too
 SIMPLE_IPV4_RE = re.compile("(?:\d{1,3}\.){3}\d{1,3}")
@@ -86,16 +84,16 @@ class SimpleIpGetter(object):
         for i in range(num):
             if i % l == 0:
                 el = random.randrange(l)
-                yield self.service_names[el] 
+                yield self.service_names[el]
                 next_array = list(self.service_names)
                 del next_array[el]
                 k = l
             else:
                 k -= 1
                 el = random.randrange(k)
-                yield next_array[el] 
+                yield next_array[el]
                 del next_array[el]
-                
+
     def get(self, tries=3):
         for service in self.iter_rand_service(tries):
             res = self.query_service(service)
@@ -144,7 +142,7 @@ class KeyConfigParser(object):
 
     def get_keyword(self, match):
         text = match.group()
-        if text == "key" and self.state == None:
+        if text == "key" and self.state is None:
             self.state = "keyname"
         elif text == "algorithm" and self.state == "keyblock":
             self.states.append('algorithm')
@@ -157,8 +155,10 @@ class KeyConfigParser(object):
             else:
                 raise ParseError('Bad algorithm type "{0}"').format(text)
         else:
-            raise ParseError('Bad keyword "{0}" with state "{1}"' \
-                .format(text, str(self.state)))
+            raise ParseError(
+                'Bad keyword "{0}" with state "{1}"'
+                .format(text, str(self.state))
+            )
 
     def get_string(self, match):
         value, = match.groups()
@@ -219,7 +219,7 @@ class KeyConfig(object):
     STRING_RE = re.compile('"([^"]*)"')
     BLOCK_BEGIN_RE = re.compile('{')
     BLOCK_END_RE = re.compile('}')
-    END_COMMAND_RE = re.compile(';');
+    END_COMMAND_RE = re.compile(';')
 
     class Tokens(object):
         SPACE = 0
