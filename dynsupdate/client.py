@@ -3,6 +3,7 @@ import socket
 import contextlib
 import sys
 import random
+import dns.resolver
 
 
 PY2 = sys.version_info[0] == 2
@@ -101,3 +102,10 @@ class SimpleIpGetter(object):
                 return res
 
         raise IpFetchError("Can't fetch ip address")
+
+
+def build_resolver(server):
+    for rdata in dns.resolver.query(server, 'A'):
+        new_resolver = dns.resolver.Resolver(configure=False)
+        new_resolver.nameservers.append(rdata.address)
+        return new_resolver

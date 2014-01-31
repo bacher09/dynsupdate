@@ -26,6 +26,11 @@ class DetectIpTests(TestCase):
             "Some service return bad result {0}".format(str(services_ips))
         )
 
+    @skip("To slow")
+    def test_build_resolver(self):
+        res = client.build_resolver('google-public-dns-a.google.com')
+        self.assertListEqual(res.nameservers, ['8.8.8.8'])
+
     @mock.patch('dynsupdate.client.urlopen', spec=client.urlopen)
     def test_services(self, urlopen_mock):
         def fake_urlopen(url, *args, **kwargs):
