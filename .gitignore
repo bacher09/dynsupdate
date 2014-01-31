@@ -1,3 +1,7 @@
 *.py[co]
 *.sw[op]
 venv/
+*.egg-info
+.tox/
+.coverage
+nosetests.xml
