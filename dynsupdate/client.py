@@ -2,6 +2,7 @@ import re
 import socket
 import contextlib
 import sys
+import random
 
 
 PY2 = sys.version_info[0] == 2
@@ -56,6 +57,10 @@ def simple_ip_fetch(url, extract_fun=lambda x: x.strip(), timeout=5):
         return extract_fun(data)
 
 
+class IpFetchError(Exception):
+    pass
+
+
 class SimpleIpGetter(object):
 
     def __init__(self, services, timeout=5):
@@ -73,3 +78,26 @@ class SimpleIpGetter(object):
 
         args = self.services[service_name]
         return simple_ip_fetch(*args, timeout=self.timeout)
+
+    def iter_rand_service(self, num):
+        l = len(self.service_names)
+        for i in range(num):
+            if i % l == 0:
+                el = random.randrange(l)
+                yield self.service_names[el] 
+                next_array = list(self.service_names)
+                del next_array[el]
+                k = l
+            else:
+                k -= 1
+                el = random.randrange(k)
+                yield next_array[el] 
+                del next_array[el]
+                
+    def get(self, tries=3):
+        for service in self.iter_rand_service(tries):
+            res = self.query_service(service)
+            if res is not None:
+                return res
+
+        raise IpFetchError("Can't fetch ip address")
