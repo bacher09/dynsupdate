@@ -9,6 +9,28 @@ key "keyname" {
 };
 """
 
+PSEUDO_KEY2 = """
+key "keyname" {
+    secret "keyhere";
+    algorithm hmac-sha256;
+};
+"""
+
+PSEUDO_KEYS = """
+key "one" {
+    secret "keyhere";
+    algorithm hmac-md5;
+};
+
+key "two" {
+    algorithm hmac-sha512;
+    secret "keyhere";
+};
+
+key "three" {secret "keyhere"; algorithm hmac-sha384;};
+key "four" { algorithm hmac-sha224; secret "keyhere"; };
+"""
+
 
 class KeyConfigTests(TestCase):
 
@@ -49,3 +71,50 @@ class KeyConfigTests(TestCase):
                 s_token_id = valid
 
             self.assertEqual(g_token_id, s_token_id)
+
+    def test_parse(self):
+        def check():
+            self.assertTupleEqual(tuple(parser.keys.keys()), ("keyname",))
+            key = parser.keys["keyname"]
+            self.assertEqual(key.algorithm, "hmac-sha256")
+            self.assertEqual(key.key, "keyhere")
+
+        parser = client.KeyConfigParser()
+        client.KeyConfig.parse(PSEUDO_KEY, parser)
+        check()
+
+        parser = client.KeyConfigParser()
+        client.KeyConfig.parse(PSEUDO_KEY2, parser)
+        check()
+
+    def test_parse_multiple(self):
+        parser = client.KeyConfigParser()
+        client.KeyConfig.parse(PSEUDO_KEYS, parser)
+        self.assertTupleEqual(
+            tuple(parser.keys_names),
+            ("one", "two", "three", "four",)
+        )
+
+        key = parser.keys['one']
+        self.assertTupleEqual(
+            (key.algorithm, key.key),
+            ("hmac-md5", "keyhere")
+        )
+
+        key = parser.keys['two']
+        self.assertTupleEqual(
+            (key.algorithm, key.key),
+            ("hmac-sha512", "keyhere")
+        )
+
+        key = parser.keys['three']
+        self.assertTupleEqual(
+            (key.algorithm, key.key),
+            ("hmac-sha384", "keyhere")
+        )
+
+        key = parser.keys['four']
+        self.assertTupleEqual(
+            (key.algorithm, key.key),
+            ("hmac-sha224", "keyhere")
+        )

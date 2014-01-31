@@ -4,6 +4,7 @@ import contextlib
 import sys
 import random
 import dns.resolver
+from collections import namedtuple
 
 
 PY2 = sys.version_info[0] == 2
@@ -115,6 +116,102 @@ class BadToken(Exception):
     pass
 
 
+class ParseError(Exception):
+    pass
+
+
+KeyData = namedtuple("KeyData", ["algorithm", "key"])
+
+
+class KeyConfigParser(object):
+
+    ALGORITHMS = frozenset([
+        "hmac-md5", "hmac-sha1", "hmac-sha224", "hmac-sha256", "hmac-sha384",
+        "hmac-sha512"
+    ])
+
+    def __init__(self):
+        self.keys = {}
+        self.states = list()
+        self.keys_names = []
+
+        self.current_key_name = None
+        self.current_key_algorithm = None
+        self.current_key_data = None
+
+    def get_space(self, match):
+        pass
+
+    def get_keyword(self, match):
+        text = match.group()
+        if text == "key" and self.state == None:
+            self.state = "keyname"
+        elif text == "algorithm" and self.state == "keyblock":
+            self.states.append('algorithm')
+        elif text == "secret" and self.state == "keyblock":
+            self.states.append('secret')
+        elif self.state == "algorithm":
+            if text in self.ALGORITHMS:
+                self.current_key_algorithm = text
+                self.state = "waitend"
+            else:
+                raise ParseError('Bad algorithm type "{0}"').format(text)
+        else:
+            raise ParseError('Bad keyword "{0}" with state "{1}"' \
+                .format(text, str(self.state)))
+
+    def get_string(self, match):
+        value, = match.groups()
+        if self.state == "keyname":
+            self.state = "waitblock"
+            if value not in self.keys:
+                # get keyname
+                self.current_key_name = value
+            else:
+                raise ParseError('Key "{0}" already exists'.format(value))
+        elif self.state == "secret":
+            self.current_key_data = value
+            self.state = "waitend"
+        else:
+            raise ParseError('Bad string {0}'.format(value))
+
+    def get_block_begin(self, match):
+        if self.state == "waitblock":
+            self.state = "keyblock"
+        else:
+            raise ParseError("Bad block")
+
+    def get_block_end(self, match):
+        keys_data = [
+            self.current_key_name, self.current_key_algorithm,
+            self.current_key_data
+        ]
+        if None in keys_data:
+            raise ParseError("Bad key data {0}".format(str(keys_data)))
+        key = KeyData(self.current_key_algorithm, self.current_key_data)
+        self.keys[self.current_key_name] = key
+        self.keys_names.append(self.current_key_name)
+        self.state = "waitend"
+
+    def get_end(self, match):
+        if self.state == "waitend":
+            self.states.pop()
+        else:
+            raise ParseError("Bad end statement")
+
+    @property
+    def state(self):
+        if not self.states:
+            return None
+        return self.states[-1]
+
+    @state.setter
+    def state(self, val):
+        if self.states:
+            self.states.pop()
+        self.states.append(val)
+
+
 class KeyConfig(object):
 
     WHITE_SPACE_RE = re.compile("\s+")
@@ -157,3 +254,20 @@ class KeyConfig(object):
             m, token_id = cls.get_current_token(data, pos)
             yield (m, token_id)
             pos = m.end()
+
+    @classmethod
+    def parse(cls, data, parser):
+        tokens_methods = {
+            cls.Tokens.SPACE: 'get_space',
+            cls.Tokens.KEYWORD: 'get_keyword',
+            cls.Tokens.STRING: 'get_string',
+            cls.Tokens.BLOCK_BEGIN: 'get_block_begin',
+            cls.Tokens.BLOCK_END: 'get_block_end',
+            cls.Tokens.END_COMMAND: 'get_end'
+        }
+        for m, token_id in cls.tokenize(data):
+            method = tokens_methods.get(token_id)
+            if method is None:
+                raise BadToken('Uknown token "{0}"'.format(token_id))
+
+            getattr(parser, method)(m)
