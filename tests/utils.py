@@ -1,7 +1,7 @@
 try:
-    from unittest import TestCase, skip, skipIf
+    from unittest import TestCase, skip, skipIf, skipUnless
 except ImportError:
-    from unittest2 import TestCase, skip, skipIf
+    from unittest2 import TestCase, skip, skipIf, skipUnless
 
 
 try:

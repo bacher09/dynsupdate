@@ -1,7 +1,8 @@
-from .utils import TestCase, skip, mock, StringIO
+from .utils import TestCase, skipUnless, mock, StringIO
 from dynsupdate import client
 from itertools import cycle
 import socket
+import os
 
 
 class DetectIpTests(TestCase):
@@ -15,7 +16,7 @@ class DetectIpTests(TestCase):
             ('yetanother', 'http://yetanother.com')
         )
 
-    @skip("To slow")
+    @skipUnless(os.getenv("SLOW"), "To slow")
     def test_real_services(self):
         services_ips = {}
         for service in self.ip_get.service_names:
@@ -26,7 +27,7 @@ class DetectIpTests(TestCase):
             "Some service return bad result {0}".format(str(services_ips))
         )
 
-    @skip("To slow")
+    @skipUnless(os.getenv("SLOW"), "To slow")
     def test_build_resolver(self):
         domain = 'google-public-dns-a.google.com'
         res = client.NameUpdate.build_resolver(domain)
