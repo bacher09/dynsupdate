@@ -139,7 +139,7 @@ class KeyConfigParser(object):
         pass
 
     def get_keyword(self, match):
-        text = match.group()
+        text = match.group().lower()
         if text == "key" and self.state is None:
             self.state = "keyname"
         elif text == "algorithm" and self.state == "keyblock":

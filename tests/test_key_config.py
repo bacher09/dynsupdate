@@ -9,6 +9,13 @@ key "keyname" {
 };
 """
 
+PSEUDO_KEY_MIXED_CASE = """
+keY "keyname" {
+    alGorithm hMaC-sHa256;
+    sEcrEt "keyhere";
+};
+"""
+
 PSEUDO_KEY2 = """
 key "keyname" {
     secret "keyhere";
@@ -83,6 +90,9 @@ class KeyConfigTests(TestCase):
         check(parser)
 
         parser = client.KeyConfigParser.parse_keys(PSEUDO_KEY2)
+        check(parser)
+
+        parser = client.KeyConfigParser.parse_keys(PSEUDO_KEY_MIXED_CASE)
         check(parser)
 
     def test_parse_multiple(self):
