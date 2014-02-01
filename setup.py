@@ -47,5 +47,6 @@ setup(
         'console_scripts': [
             'dynsupdate = dynsupdate.client:main'
         ]
-    }
+    },
+    version="0.1a"
 )
