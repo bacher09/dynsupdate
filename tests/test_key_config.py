@@ -73,23 +73,20 @@ class KeyConfigTests(TestCase):
             self.assertEqual(g_token_id, s_token_id)
 
     def test_parse(self):
-        def check():
+        def check(parser):
             self.assertTupleEqual(tuple(parser.keys.keys()), ("keyname",))
-            key = parser.keys["keyname"]
+            key = parser.get_key()
             self.assertEqual(key.algorithm, "hmac-sha256")
             self.assertEqual(key.key, "keyhere")
 
-        parser = client.KeyConfigParser()
-        client.KeyConfig.parse(PSEUDO_KEY, parser)
-        check()
+        parser = client.KeyConfigParser.parse_keys(PSEUDO_KEY)
+        check(parser)
 
-        parser = client.KeyConfigParser()
-        client.KeyConfig.parse(PSEUDO_KEY2, parser)
-        check()
+        parser = client.KeyConfigParser.parse_keys(PSEUDO_KEY2)
+        check(parser)
 
     def test_parse_multiple(self):
-        parser = client.KeyConfigParser()
-        client.KeyConfig.parse(PSEUDO_KEYS, parser)
+        parser = client.KeyConfigParser.parse_keys(PSEUDO_KEYS)
         self.assertTupleEqual(
             tuple(parser.keys_names),
             ("one", "two", "three", "four",)

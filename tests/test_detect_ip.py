@@ -28,7 +28,8 @@ class DetectIpTests(TestCase):
 
     @skip("To slow")
     def test_build_resolver(self):
-        res = client.build_resolver('google-public-dns-a.google.com')
+        domain = 'google-public-dns-a.google.com'
+        res = client.NameUpdate.build_resolver(domain)
         self.assertListEqual(res.nameservers, ['8.8.8.8'])
 
     @mock.patch('dynsupdate.client.urlopen', spec=client.urlopen)

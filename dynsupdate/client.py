@@ -3,8 +3,9 @@ import socket
 import contextlib
 import sys
 import random
-import dns.resolver
 from collections import namedtuple
+import dns.resolver
+import dns.update
 
 
 PY2 = sys.version_info[0] == 2
@@ -103,13 +104,6 @@ class SimpleIpGetter(object):
         raise IpFetchError("Can't fetch ip address")
 
 
-def build_resolver(server):
-    for rdata in dns.resolver.query(server, 'A'):
-        new_resolver = dns.resolver.Resolver(configure=False)
-        new_resolver.nameservers.append(rdata.address)
-        return new_resolver
-
-
 class BadToken(Exception):
     pass
 
@@ -118,7 +112,11 @@ class ParseError(Exception):
     pass
 
 
-KeyData = namedtuple("KeyData", ["algorithm", "key"])
+class NoKeysError(Exception):
+    pass
+
+
+KeyData = namedtuple("KeyData", ["name", "algorithm", "key"])
 
 
 class KeyConfigParser(object):
@@ -188,9 +186,9 @@ class KeyConfigParser(object):
         ]
         if None in keys_data:
             raise ParseError("Bad key data {0}".format(str(keys_data)))
-        key = KeyData(self.current_key_algorithm, self.current_key_data)
-        self.keys[self.current_key_name] = key
-        self.keys_names.append(self.current_key_name)
+
+        self.get_new_key(self.current_key_name, self.current_key_algorithm,
+                         self.current_key_data)
         self.state = "waitend"
 
     def get_end(self, match):
@@ -198,6 +196,11 @@ class KeyConfigParser(object):
             self.states.pop()
         else:
             raise ParseError("Bad end statement")
+
+    def get_new_key(self, key_name, algorithm, key_data):
+        key = KeyData(key_name, algorithm, key_data)
+        self.keys[key_name] = key
+        self.keys_names.append(key_name)
 
     @property
     def state(self):
@@ -210,6 +213,21 @@ class KeyConfigParser(object):
         if self.states:
             self.states.pop()
         self.states.append(val)
+
+    def get_key(self, key_name=None):
+        if not self.keys_names:
+            raise NoKeysError("No keys")
+
+        if key_name is None:
+            key_name = self.keys_names[0]
+
+        return self.keys[key_name]
+
+    @classmethod
+    def parse_keys(cls, data):
+        parser = cls()
+        KeyConfig.parse(data, parser)
+        return parser
 
 
 class KeyConfig(object):
@@ -271,3 +289,24 @@ class KeyConfig(object):
                 raise BadToken('Uknown token "{0}"'.format(token_id))
 
             getattr(parser, method)(m)
+
+    @staticmethod
+    def get_keyring(key_name, key_data):
+        import dns.tsigkeyring
+        return dns.tsigkeyring.from_text({key_name: key_data})
+
+
+class NameUpdate(object):
+
+    @staticmethod
+    def build_updater(zone, key):
+        keyring = KeyConfig.get_keyring(key.name, key.key)
+        return dns.update.Update(zone, keyring=keyring,
+                                 keyalgorithm=key.algorithm)
+
+    @staticmethod
+    def build_resolver(server):
+        for rdata in dns.resolver.query(server, 'A'):
+            new_resolver = dns.resolver.Resolver(configure=False)
+            new_resolver.nameservers.append(rdata.address)
+            return new_resolver
