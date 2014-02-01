@@ -6,6 +6,8 @@ import random
 from collections import namedtuple
 import dns.resolver
 import dns.update
+import dns.tsigkeyring
+import dns.query
 
 
 PY2 = sys.version_info[0] == 2
@@ -292,11 +294,26 @@ class KeyConfig(object):
 
     @staticmethod
     def get_keyring(key_name, key_data):
-        import dns.tsigkeyring
         return dns.tsigkeyring.from_text({key_name: key_data})
 
 
 class NameUpdate(object):
+
+    def __init__(self, server, zone, key, keyname=None, port=53):
+        self.server = server
+        self.zone = zone
+        if isinstance(key, KeyData):
+            self.key = key
+        else:
+            self.key = self.key_from_file(key, keyname)
+        self.port = 53
+        self.resolver = self.build_resolver(server)
+
+    def get_updater(self):
+        return self.build_updater(self.zone, self.key)
+
+    def send(self, update, timeout=7):
+        dns.query.tcp(update, self.server, timeout=timeout, port=self.port)
 
     @staticmethod
     def build_updater(zone, key):
@@ -305,8 +322,19 @@ class NameUpdate(object):
                                  keyalgorithm=key.algorithm)
 
     @staticmethod
-    def build_resolver(server):
+    def build_resolver(server, port=53):
         for rdata in dns.resolver.query(server, 'A'):
             new_resolver = dns.resolver.Resolver(configure=False)
             new_resolver.nameservers.append(rdata.address)
+            new_resolver.port = port
             return new_resolver
+
+    @staticmethod
+    def key_from_file(filename, keyname=None):
+        if hasattr(filename, "read"):
+            data = filename.read()
+        else:
+            with open(filename, 'rb') as f:
+                data = f.read()
+
+        return KeyConfigParser.parse_keys(data).get_key(keyname)

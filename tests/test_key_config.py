@@ -1,4 +1,4 @@
-from .utils import TestCase
+from .utils import TestCase, StringIO, mock
 from dynsupdate import client
 
 
@@ -102,26 +102,38 @@ class KeyConfigTests(TestCase):
             ("one", "two", "three", "four",)
         )
 
-        key = parser.keys['one']
+        key = parser.get_key('one')
         self.assertTupleEqual(
             (key.algorithm, key.key),
             ("hmac-md5", "keyhere")
         )
 
-        key = parser.keys['two']
+        key = parser.get_key('two')
         self.assertTupleEqual(
             (key.algorithm, key.key),
             ("hmac-sha512", "keyhere")
         )
 
-        key = parser.keys['three']
+        key = parser.get_key('three')
         self.assertTupleEqual(
             (key.algorithm, key.key),
             ("hmac-sha384", "keyhere")
         )
 
-        key = parser.keys['four']
+        key = parser.get_key('four')
         self.assertTupleEqual(
             (key.algorithm, key.key),
             ("hmac-sha224", "keyhere")
         )
+
+    def test_parse_file(self):
+        key_cmp = client.KeyData("two", "hmac-sha512", "keyhere")
+        file_obj = StringIO(PSEUDO_KEYS)
+        key = client.NameUpdate.key_from_file(file_obj, "two")
+        self.assertEqual(key, key_cmp)
+
+        open_m = mock.mock_open(read_data=PSEUDO_KEYS)
+        with mock.patch("dynsupdate.client.open", open_m, create=True):
+            key2 = client.NameUpdate.key_from_file("some.key", "two")
+            open_m.assert_called_with("some.key", mock.ANY)
+            self.assertEqual(key2, key_cmp)
