@@ -58,6 +58,6 @@ class DetectIpTests(TestCase):
         ip_get = client.SimpleIpGetter(self.small_services)
         with mock.patch.object(ip_get, 'query_service') as query_mock:
             query_mock.return_value = None
-            self.assertRaises(client.IpFetchError, ip_get.get)
-            calls = [mock.call(n) for n in ip_get.service_names]
+            self.assertRaises(client.IpFetchError, ip_get.get, timeout=10)
+            calls = [mock.call(n, timeout=10) for n in ip_get.service_names]
             query_mock.assert_has_calls(calls)

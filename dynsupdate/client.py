@@ -8,6 +8,7 @@ import dns.resolver
 import dns.update
 import dns.tsigkeyring
 import dns.query
+import argparse
 
 
 PY2 = sys.version_info[0] == 2
@@ -33,20 +34,23 @@ def ip_from_dyndns(data):
 
 # TODO: support dig +short myip.opendns.com @resolver1.opendns.com
 HTTPS_IP_SERVICES = (
-    ('https_icanhazip', 'https://icanhazip.com/'),
+    ('https:icanhazip', 'https://icanhazip.com/'),
 )
 
 
 HTTP_IP_SERVICES = (
-    ('dyndns', 'http://checkip.dyndns.com/', ip_from_dyndns),
-    ('icanhazip', 'http://icanhazip.com/'),
-    ('curlmyip', 'http://curlmyip.com/'),
-    ('ifconfigme', 'http://ifconfig.me/ip'),
-    ('ip.appspot.com', 'http://ip.appspot.com'),
-    ('ipinfo', 'http://ipinfo.io/ip'),
-    ('externalip', 'http://api.externalip.net/ip'),
-    ('trackip', 'http://www.trackip.net/ip')
+    ('http:dyndns', 'http://checkip.dyndns.com/', ip_from_dyndns),
+    ('http:icanhazip', 'http://icanhazip.com/'),
+    ('http:curlmyip', 'http://curlmyip.com/'),
+    ('http:ifconfigme', 'http://ifconfig.me/ip'),
+    ('http:ip.appspot.com', 'http://ip.appspot.com'),
+    ('http:ipinfo', 'http://ipinfo.io/ip'),
+    ('http:externalip', 'http://api.externalip.net/ip'),
+    ('http:trackip', 'http://www.trackip.net/ip')
 )
+
+
+ALL_IP_SERVICES = HTTP_IP_SERVICES + HTTPS_IP_SERVICES
 
 
 def simple_ip_fetch(url, extract_fun=lambda x: x.strip(), timeout=5):
@@ -66,21 +70,27 @@ class IpFetchError(Exception):
 
 class SimpleIpGetter(object):
 
-    def __init__(self, services, timeout=5):
+    DEFAULT_TIMEOUT = 5
+    DEFAULT_TRIES = 3
+    ALL_SERVICES = ALL_IP_SERVICES
+
+    def __init__(self, services):
         self.services = {}
+        if not services:
+            raise ValueError("At least one service should exist")
+
         for service in services:
             name = service[0]
             self.services[name] = service[1:]
 
         self.service_names = tuple(self.services.keys())
-        self.timeout = timeout
 
-    def query_service(self, service_name):
+    def query_service(self, service_name, timeout=DEFAULT_TIMEOUT):
         if service_name not in self.services:
             raise ValueError("Bad service_name '{0}'".format(service_name))
 
         args = self.services[service_name]
-        return simple_ip_fetch(*args, timeout=self.timeout)
+        return simple_ip_fetch(*args, timeout=timeout)
 
     def iter_rand_service(self, num):
         l = len(self.service_names)
@@ -97,13 +107,55 @@ class SimpleIpGetter(object):
                 yield next_array[el]
                 del next_array[el]
 
-    def get(self, tries=3):
+    def get(self, tries=DEFAULT_TRIES, timeout=DEFAULT_TIMEOUT):
         for service in self.iter_rand_service(tries):
-            res = self.query_service(service)
+            res = self.query_service(service, timeout=timeout)
             if res is not None:
                 return res
 
         raise IpFetchError("Can't fetch ip address")
+
+    @staticmethod
+    def get_service_info(servicename):
+        return servicename.split(':', 1)
+
+    @classmethod
+    def service_info_iterator(cls, services):
+        for service in services:
+            servicename = service[0]
+            service_type, name = cls.get_service_info(servicename)
+            yield (service_type, name, service)
+
+    @classmethod
+    def get_types_and_names(cls):
+        types, names = [], []
+        for stype, name, _ in cls.service_info_iterator(cls.ALL_SERVICES):
+            types.append(stype)
+            names.append(name)
+
+        return frozenset(types), frozenset(names)
+
+    @classmethod
+    def filter_services(cls, services, types=None, names=None):
+        if types is not None:
+            types = frozenset(types)
+        if names is not None:
+            names = frozenset(names)
+
+        for type, name, service in cls.service_info_iterator(services):
+            if types is None or type in types:
+                if names is None or name in names:
+                    yield service
+
+    @classmethod
+    def create_new_ip_getter(cls, types=None, names=None):
+        service_iter = cls.filter_services(cls.ALL_SERVICES, types, names)
+        return cls(service_iter)
+
+
+#set types and names
+SimpleIpGetter.SERVICE_TYPES, SimpleIpGetter.SERVICE_NAMES = \
+    SimpleIpGetter.get_types_and_names()
 
 
 class BadToken(Exception):
@@ -338,3 +390,77 @@ class NameUpdate(object):
                 data = f.read()
 
         return KeyConfigParser.parse_keys(data).get_key(keyname)
+
+
+def comma_separated_list(values):
+    check_values = frozenset(values)
+    def parse(input_str):
+        res = frozenset(input_str.split(','))
+        diff = res - check_values
+        if diff:
+            raise argparse.ArgumentTypeError(
+                "Bad input {0}".format(str(tuple(diff)))
+            )
+
+        return res
+
+    return parse
+
+
+class Program(object):
+
+    COMMANDS = {
+        'checkip': 'checkip_command'
+    }
+
+    SERVICE_TYPES = frozenset(['http', 'https'])
+
+    def __init__(self):
+        self.parser = self.build_parser()
+
+    def run(self, args=None):
+        namespace = self.parser.parse_args(args)
+        self.execute(namespace)
+
+    def execute(self, namespace):
+        print(namespace)
+        exec_command = self.COMMANDS.get(namespace.command)
+        if exec_command is not None:
+            kwargs = vars(namespace)
+            del kwargs['command']
+            getattr(self, exec_command)(**kwargs)
+        else:
+            raise ValueError("Bad command {0}".format(namespace.command))
+
+    def checkip_command(self, tries=5, timeout=5, types=None, services=None):
+        ip_get = SimpleIpGetter.create_new_ip_getter(types, services)
+        print(ip_get.get(tries=tries, timeout=timeout))
+
+    @classmethod
+    def build_parser(cls):
+        parser = argparse.ArgumentParser(description="dynamic dns update")
+        subparsers = parser.add_subparsers(dest="command")
+        checkip_parser = subparsers.add_parser('checkip', help="return ip")
+        checkip_parser \
+            .add_argument('-n', '--tries', dest="tries", type=int, default=5)
+        checkip_parser.add_argument(
+            '-t', '--types', dest="types",
+            type=comma_separated_list(SimpleIpGetter.SERVICE_TYPES),
+            default=None
+        )
+        checkip_parser.add_argument(
+            '-s', '--services', dest="services",
+            type=comma_separated_list(SimpleIpGetter.SERVICE_NAMES),
+            default=None
+        )
+        checkip_parser \
+            .add_argument('--timeout', dest="timeout", type=int, default=5)
+        return parser
+
+
+def main():
+    Program().run()
+
+
+if __name__ == "__main__":
+    main()

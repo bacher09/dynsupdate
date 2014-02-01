@@ -32,6 +32,7 @@ if lt33():
 
 
 if lt27():
+    install_packages.append('argparse')
     tests_require.append('unittest2')
 
 
@@ -41,5 +42,10 @@ setup(
     install_requires=install_packages,
     tests_require=tests_require,
     packages=find_packages(),
-    test_suite="nose.collector"
+    test_suite="nose.collector",
+    entry_points={
+        'console_scripts': [
+            'dynsupdate = dynsupdate.client:main'
+        ]
+    }
 )
