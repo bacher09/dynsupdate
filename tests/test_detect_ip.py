@@ -38,6 +38,13 @@ class DetectIpTests(TestCase):
             self.assertEqual(self.ip_get.query_service(service), "127.0.0.1")
 
     @mock.patch('dynsupdate.client.urlopen', spec=client.urlopen)
+    def test_bad_query_services(self, urlopen_mock):
+        self.assertRaises(ValueError, self.ip_get.query_service, 'bad')
+
+    def test_bad_create_ip_getter(self):
+        self.assertRaises(ValueError, client.SimpleIpGetter, [])
+
+    @mock.patch('dynsupdate.client.urlopen', spec=client.urlopen)
     def test_network_issues(self, urlopen_mock):
         urlopen_mock.side_effect = cycle([client.URLError("Bad url"),
                                           socket.error])
