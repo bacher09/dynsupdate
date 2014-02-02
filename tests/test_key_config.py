@@ -38,6 +38,23 @@ key "three" {secret "keyhere"; algorithm hmac-sha384;};
 key "four" { algorithm hmac-sha224; secret "keyhere"; };
 """
 
+BAD_KEY1 = 'ke "name" {secret "keyhere"; algorithm hmac-sha384;};'
+BAD_KEY2 = 'key "name" {secret "keyhere"; algorithm bad;};'
+# no ;
+BAD_KEY3 = 'key "name" {secret "keyhere" algorithm hmac-md5;};'
+# double key
+BAD_KEY4 = """
+key "name" {secret "keyhere"; algorithm hmac-md5;};
+key "name" {secret "keyhere"; algorithm hmac-sha384;};
+"""
+# bad block
+BAD_KEY5 = 'key {}'
+# bad string
+BAD_KEY6 = 'key "name" "othername"'
+# bad block
+BAD_KEY7 = 'key ;'
+BAD_KEY8 = 'key "name" { algorithm hmac-md5;};'
+
 
 class KeyConfigTests(TestCase):
 
@@ -137,3 +154,47 @@ class KeyConfigTests(TestCase):
             key2 = client.NameUpdate.key_from_file("some.key", "two")
             open_m.assert_called_with("some.key", mock.ANY)
             self.assertEqual(key2, key_cmp)
+
+    def test_tokenize_bad(self):
+        # test abracadabra
+        with self.assertRaises(client.BadToken):
+            list(client.KeyConfig.tokenize("@!d%&,d;3"))
+
+    @mock.patch('dynsupdate.client.KeyConfig.tokenize')
+    def test_return_bad_token(self, mock_tokenize):
+        mock_tokenize.return_value = iter([(mock.Mock(), 100)])
+        mock_parser = mock.Mock()
+        with self.assertRaises(client.BadToken):
+            client.KeyConfig.parse(mock.ANY, mock_parser)
+
+    def test_parse_bad_key(self):
+        # TODO: Match messages
+        with self.assertRaises(client.ParseError):
+            client.KeyConfigParser.parse_keys(BAD_KEY1)
+
+        # bad algorithm
+        with self.assertRaises(client.ParseError):
+            client.KeyConfigParser.parse_keys(BAD_KEY2)
+
+        # no ;
+        with self.assertRaises(client.ParseError):
+            client.KeyConfigParser.parse_keys(BAD_KEY3)
+
+        # double key
+        with self.assertRaises(client.ParseError):
+            client.KeyConfigParser.parse_keys(BAD_KEY4)
+
+        # bad block
+        with self.assertRaises(client.ParseError):
+            client.KeyConfigParser.parse_keys(BAD_KEY5)
+
+        # bad string
+        with self.assertRaises(client.ParseError):
+            client.KeyConfigParser.parse_keys(BAD_KEY6)
+
+        with self.assertRaises(client.ParseError):
+            client.KeyConfigParser.parse_keys(BAD_KEY7)
+
+        with self.assertRaises(client.ParseError):
+            client.KeyConfigParser.parse_keys(BAD_KEY8)
+

@@ -205,7 +205,7 @@ class KeyConfigParser(object):
                 self.current_key_algorithm = text
                 self.state = "waitend"
             else:
-                raise ParseError('Bad algorithm type "{0}"').format(text)
+                raise ParseError('Bad algorithm type "{0}"'.format(text))
         else:
             raise ParseError(
                 'Bad keyword "{0}" with state "{1}"'
@@ -317,7 +317,8 @@ class KeyConfig(object):
             if m is not None:
                 return (m, token_id)
 
-        raise BadToken("Unknown token")
+        message_data = data[start_pos:start_pos + 40]
+        raise BadToken('Unknown token "{0}"'.format(message_data))
 
     @classmethod
     def tokenize(cls, data):
