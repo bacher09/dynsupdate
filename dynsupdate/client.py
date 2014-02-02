@@ -57,6 +57,7 @@ ALL_IP_SERVICES = HTTP_IP_SERVICES + HTTPS_IP_SERVICES
 
 
 def simple_ip_fetch(url, extract_fun=lambda x: x.strip(), timeout=5):
+    logger.debug('fetching url "{0}"'.format(url))
     try:
         with contextlib.closing(urlopen(url, timeout=timeout)) as resp:
             # Limit response size
@@ -89,7 +90,7 @@ class SimpleIpGetter(object):
         self.service_names = tuple(self.services.keys())
 
     def query_service(self, service_name, timeout=DEFAULT_TIMEOUT):
-        logger.info(service_name) # add more info
+        logger.info('query service "{0}"'.format(service_name))
         if service_name not in self.services:
             raise ValueError("Bad service_name '{0}'".format(service_name))
 
@@ -439,6 +440,13 @@ class Program(object):
         'update': 'update_command'
     }
 
+    VERBOSITY = (
+        logging.ERROR,
+        logging.WARNING,
+        logging.INFO,
+        logging.DEBUG,
+    )
+
     SERVICE_TYPES = frozenset(['http', 'https'])
 
     def __init__(self):
@@ -452,7 +460,11 @@ class Program(object):
         self.execute(namespace, log=log)
 
     def set_verbosity(self, verbosity):
-        logger.setLevel(logging.DEBUG)
+        count = len(self.VERBOSITY)
+        if verbosity >= count:
+            verbosity = count - 1
+
+        logger.setLevel(self.VERBOSITY[verbosity])
 
     def set_loghandler(self):
         logger.addHandler(logging.StreamHandler())
