@@ -61,3 +61,42 @@ class DetectIpTests(TestCase):
             self.assertRaises(client.IpFetchError, ip_get.get, timeout=10)
             calls = [mock.call(n, timeout=10) for n in ip_get.service_names]
             query_mock.assert_has_calls(calls)
+
+    def test_filter_services(self):
+        TEST_SERVICES = (
+            ('http:test', 'http://test.com/'),
+            ('https:test', 'https://test.com/'),
+            ('http:other', 'http://other.com/'),
+            ('http:service', 'http://sercice.com/')
+        )
+
+        http_services = client.SimpleIpGetter \
+            .filter_services(TEST_SERVICES, types=['http'])
+
+        https_services = client.SimpleIpGetter \
+            .filter_services(TEST_SERVICES, types=['https'])
+
+        self.assertTupleEqual(tuple(http_services), (
+            ('http:test', 'http://test.com/'),
+            ('http:other', 'http://other.com/'),
+            ('http:service', 'http://sercice.com/')
+        ))
+
+        self.assertTupleEqual(tuple(https_services), (
+            ('https:test', 'https://test.com/'),
+        ))
+
+        tests_services = client.SimpleIpGetter \
+            .filter_services(TEST_SERVICES, names=['test'])
+
+        self.assertTupleEqual(tuple(tests_services), (
+            ('http:test', 'http://test.com/'),
+            ('https:test', 'https://test.com/'),
+        ))
+
+        tests2_services = client.SimpleIpGetter \
+            .filter_services(TEST_SERVICES, types=['http'], names=['test'])
+
+        self.assertTupleEqual(tuple(tests2_services), (
+            ('http:test', 'http://test.com/'),
+        ))
