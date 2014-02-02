@@ -21,6 +21,6 @@ class CliIterfaceTest(TestCase):
         response_mock = mock.mock_open(read_data="127.0.0.1\n")
         urlopen_mock.side_effect = response_mock
         prog = client.Program()
-        prog.run("checkip".split())
+        prog.run("checkip".split(), log=False)
         ret_value = stdout_mock.getvalue()
         self.assertTrue('127.0.0.1' in ret_value)

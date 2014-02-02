@@ -3,12 +3,14 @@ import socket
 import contextlib
 import sys
 import random
+import argparse
+import logging
 from collections import namedtuple
+from functools import partial
 import dns.resolver
 import dns.update
 import dns.tsigkeyring
 import dns.query
-import argparse
 
 
 PY2 = sys.version_info[0] == 2
@@ -25,6 +27,7 @@ else:
 MAX_RESPONSE_DATA = 8192
 # TODO: Support IPv6 too
 SIMPLE_IPV4_RE = re.compile("(?:\d{1,3}\.){3}\d{1,3}")
+logger = logging.getLogger(__name__)
 
 
 def ip_from_dyndns(data):
@@ -86,6 +89,7 @@ class SimpleIpGetter(object):
         self.service_names = tuple(self.services.keys())
 
     def query_service(self, service_name, timeout=DEFAULT_TIMEOUT):
+        logger.info(service_name) # add more info
         if service_name not in self.services:
             raise ValueError("Bad service_name '{0}'".format(service_name))
 
@@ -352,6 +356,8 @@ class KeyConfig(object):
 
 class NameUpdate(object):
 
+    DEFAULT_TTL = 600
+
     def __init__(self, server, zone, key, keyname=None, port=53):
         self.server = server
         self.zone = zone
@@ -360,13 +366,21 @@ class NameUpdate(object):
         else:
             self.key = self.key_from_file(key, keyname)
         self.port = 53
-        self.resolver = self.build_resolver(server)
 
     def get_updater(self):
         return self.build_updater(self.zone, self.key)
 
     def send(self, update, timeout=7):
         dns.query.tcp(update, self.server, timeout=timeout, port=self.port)
+
+    def update_a(self, domain, ip, resolver, ttl=DEFAULT_TTL, timeout=7):
+        old_ip = self.check_name(resolver, domain)
+        if ip != old_ip:
+            updater = self.get_updater()
+            updater.replace(domain, ttl, 'A', ip)
+            self.send(updater, timeout=timeout)
+            return True
+        return False
 
     @staticmethod
     def build_updater(zone, key):
@@ -392,6 +406,16 @@ class NameUpdate(object):
 
         return KeyConfigParser.parse_keys(data).get_key(keyname)
 
+    @staticmethod
+    def determine_server(zone):
+        for rdata in dns.resolver.query(zone, 'SOA'):
+            return rdata.mname
+
+    @staticmethod
+    def check_name(resolver, name):
+        for rdata in resolver.query(name, 'A'):
+            return rdata.address
+
 
 def comma_separated_list(values):
     check_values = frozenset(values)
@@ -411,7 +435,8 @@ def comma_separated_list(values):
 class Program(object):
 
     COMMANDS = {
-        'checkip': 'checkip_command'
+        'checkip': 'checkip_command',
+        'update': 'update_command'
     }
 
     SERVICE_TYPES = frozenset(['http', 'https'])
@@ -419,43 +444,91 @@ class Program(object):
     def __init__(self):
         self.parser = self.build_parser()
 
-    def run(self, args=None):
-        namespace = self.parser.parse_args(args)
-        self.execute(namespace)
+    def run(self, args=None, log=True):
+        if log and not logger.handlers:
+            self.set_loghandler()
 
-    def execute(self, namespace):
+        namespace = self.parser.parse_args(args)
+        self.execute(namespace, log=log)
+
+    def set_verbosity(self, verbosity):
+        logger.setLevel(logging.DEBUG)
+
+    def set_loghandler(self):
+        logger.addHandler(logging.StreamHandler())
+
+    def execute(self, namespace, log=True):
         print(namespace)
         exec_command = self.COMMANDS.get(namespace.command)
         if exec_command is not None:
             kwargs = vars(namespace)
+            if log:
+                self.set_verbosity(namespace.verbose)
             del kwargs['command']
+            del kwargs['verbose']
             getattr(self, exec_command)(**kwargs)
         else:
             raise ValueError("Bad command {0}".format(namespace.command))
 
-    def checkip_command(self, tries=5, timeout=5, types=None, services=None):
+    def checkip_command(self, *args, **kwargs):
+        ip_fun = self.ip_fun(*args, **kwargs)
+        print(ip_fun())
+
+    def update_command(self, zone, name, keyfile, keyname, server=None,
+                       tries=5, timeout=5, types=None, services=None,
+                       ttl=NameUpdate.DEFAULT_TTL, **kwargs):
+        ip_fun = self.ip_fun(tries=tries, timeout=timeout, types=types,
+                             services=services)
+        zone = dns.name.from_text(zone)
+        name = dns.name.from_text(name, zone)
+        if server is None:
+            server = NameUpdate.determine_server(zone)
+
+        try:
+            ip = ip_fun()
+        except IpFetchError:
+            pass
+        else:
+            resolver = NameUpdate.build_resolver(server)
+            nu = NameUpdate(server, zone, keyfile, keyname=keyname)
+            nu.update_a(name, ip, resolver, ttl)
+
+    @classmethod
+    def ip_fun(cls, tries=5, timeout=5, types=None, services=None):
         ip_get = SimpleIpGetter.create_new_ip_getter(types, services)
-        print(ip_get.get(tries=tries, timeout=timeout))
+        return partial(ip_get.get, tries=tries, timeout=timeout)
+
+    @classmethod
+    def ip_arguments(cls, parser):
+        types_type = comma_separated_list(SimpleIpGetter.SERVICE_TYPES)
+        services_type = comma_separated_list(SimpleIpGetter.SERVICE_NAMES)
+        parser.add_argument('-n', '--tries', dest="tries", type=int, default=5)
+        parser.add_argument('-t', '--types', dest="types", type=types_type,
+                            default=None)
+        parser.add_argument('--services', dest="services", type=services_type,
+                            default=None)
+        parser.add_argument('--timeout', dest="timeout", type=int, default=5)
 
     @classmethod
     def build_parser(cls):
+        file_type = argparse.FileType('rb')
         parser = argparse.ArgumentParser(description="dynamic dns update")
+        parser.add_argument('-v', '--verbose', action='count', dest='verbose',
+                            default=0)
         subparsers = parser.add_subparsers(dest="command")
         checkip_parser = subparsers.add_parser('checkip', help="return ip")
-        checkip_parser \
-            .add_argument('-n', '--tries', dest="tries", type=int, default=5)
-        checkip_parser.add_argument(
-            '-t', '--types', dest="types",
-            type=comma_separated_list(SimpleIpGetter.SERVICE_TYPES),
-            default=None
-        )
-        checkip_parser.add_argument(
-            '-s', '--services', dest="services",
-            type=comma_separated_list(SimpleIpGetter.SERVICE_NAMES),
-            default=None
-        )
-        checkip_parser \
-            .add_argument('--timeout', dest="timeout", type=int, default=5)
+        cls.ip_arguments(checkip_parser)
+        update_parser = subparsers.add_parser('update', help="update record")
+        update_parser.add_argument('-k', '--key', type=file_type, required=True,
+                                   dest='keyfile')
+        update_parser.add_argument('--keyname', type=str, dest='keyname',
+                                   default=None)
+        update_parser.add_argument('--ttl', type=int, dest='ttl', default=600)
+        update_parser.add_argument('-s', '--server', type=str, dest='server',
+                                   default=None)
+        update_parser.add_argument('zone', type=str)
+        update_parser.add_argument('name', type=str)
+        cls.ip_arguments(update_parser)
         return parser
 
 
