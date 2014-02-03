@@ -56,6 +56,15 @@ HTTP_IP_SERVICES = (
 ALL_IP_SERVICES = HTTP_IP_SERVICES + HTTPS_IP_SERVICES
 
 
+def validate_ipv4(ip_text):
+    try:
+        socket.inet_aton(ip_text)
+    except socket.error:
+        return False
+    else:
+        return True
+
+
 def simple_ip_fetch(url, extract_fun=lambda x: x.strip(), timeout=5):
     logger.debug('fetching url "{0}"'.format(url))
     try:
@@ -67,7 +76,9 @@ def simple_ip_fetch(url, extract_fun=lambda x: x.strip(), timeout=5):
                     .format(url, timeout))
         return None
     else:
-        return extract_fun(data)
+        ip = extract_fun(data)
+        if ip and validate_ipv4(ip):
+            return ip
 
 
 class IpFetchError(Exception):

@@ -38,6 +38,15 @@ class DetectIpTests(TestCase):
             self.assertEqual(self.ip_get.query_service(service), "127.0.0.1")
 
     @mock.patch('dynsupdate.client.urlopen', spec=client.urlopen)
+    def test_services_bad_response(self, urlopen_mock):
+        urlopen_mock.side_effect = mock.mock_open(read_data="bad response")
+
+        for service in self.ip_get.service_names:
+            resp = self.ip_get.query_service(service)
+            self.assertIsNone(resp, 'Bad response {1!r} of service "{0}"'
+                              .format(service, resp))
+
+    @mock.patch('dynsupdate.client.urlopen', spec=client.urlopen)
     def test_bad_query_services(self, urlopen_mock):
         self.assertRaises(ValueError, self.ip_get.query_service, 'bad')
 
