@@ -62,5 +62,8 @@ setup(
         "Programming Language :: Python :: 3.2",
         "Programming Language :: Python :: 3.3",
     ],
+    license="BSD",
+    author='Slava Bacherikov',
+    author_email='slava@bacherikov.org.ua',
     version="0.1a"
 )
