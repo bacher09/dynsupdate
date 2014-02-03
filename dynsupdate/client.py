@@ -383,7 +383,7 @@ class NameUpdate(object):
         old_ip = self.check_name(resolver, domain)
         if ip != old_ip:
             updater = self.get_updater()
-            updater.replace(domain, ttl, 'A', ip)
+            updater.replace(domain.relativize(self.zone), ttl, 'A', ip)
             self.send(updater, timeout=timeout)
             return True
         return False
@@ -415,7 +415,7 @@ class NameUpdate(object):
     @staticmethod
     def determine_server(zone):
         for rdata in dns.resolver.query(zone, 'SOA'):
-            return rdata.mname
+            return rdata.mname.to_text()
 
     @staticmethod
     def check_name(resolver, name):
@@ -493,13 +493,19 @@ class Program(object):
         ip_fun = self.ip_fun(*args, **kwargs)
         print(ip_fun())
 
-    def update_command(self, zone, name, keyfile, keyname, server=None,
+    def update_command(self, name, keyfile, keyname, zone=None, server=None,
                        tries=5, timeout=5, types=None, services=None,
                        ttl=NameUpdate.DEFAULT_TTL, **kwargs):
         ip_fun = self.ip_fun(tries=tries, timeout=timeout, types=types,
                              services=services)
-        zone = dns.name.from_text(zone)
-        name = dns.name.from_text(name, zone)
+
+        name = dns.name.from_text(name)
+        if zone is None:
+            # could raise Timeout
+            zone = dns.resolver.zone_for_name(name)
+        else:
+            zone = dns.name.from_text(zone)
+
         if server is None:
             server = NameUpdate.determine_server(zone)
 
@@ -538,14 +544,15 @@ class Program(object):
         checkip_parser = subparsers.add_parser('checkip', help="return ip")
         cls.ip_arguments(checkip_parser)
         update_parser = subparsers.add_parser('update', help="update record")
-        update_parser.add_argument('-k', '--key', type=file_type, required=True,
-                                   dest='keyfile')
+        update_parser.add_argument('-k', '--key', type=file_type,
+                                   required=True, dest='keyfile')
         update_parser.add_argument('--keyname', type=str, dest='keyname',
                                    default=None)
         update_parser.add_argument('--ttl', type=int, dest='ttl', default=600)
         update_parser.add_argument('-s', '--server', type=str, dest='server',
                                    default=None)
-        update_parser.add_argument('zone', type=str)
+        update_parser.add_argument('-z', '--zone', type=str, dest='zone',
+                                   default=None)
         update_parser.add_argument('name', type=str)
         cls.ip_arguments(update_parser)
         return parser
