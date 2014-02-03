@@ -63,6 +63,8 @@ def simple_ip_fetch(url, extract_fun=lambda x: x.strip(), timeout=5):
             # Limit response size
             data = resp.read(MAX_RESPONSE_DATA)
     except (URLError, socket.error) as e:
+        logger.warn('couldn\'t fetch url "{0}" with timeout {1:d}'
+                    .format(url, timeout))
         return None
     else:
         return extract_fun(data)
@@ -95,7 +97,10 @@ class SimpleIpGetter(object):
             raise ValueError("Bad service_name '{0}'".format(service_name))
 
         args = self.services[service_name]
-        return simple_ip_fetch(*args, timeout=timeout)
+        ip = simple_ip_fetch(*args, timeout=timeout)
+        logger.debug('service "{0}" return such ip "{1}"'
+                     .format(service_name, ip))
+        return ip
 
     def iter_rand_service(self, num):
         l = len(self.service_names)
@@ -420,6 +425,7 @@ class NameUpdate(object):
 
 def comma_separated_list(values):
     check_values = frozenset(values)
+
     def parse(input_str):
         res = frozenset(input_str.split(','))
         diff = res - check_values
@@ -470,12 +476,13 @@ class Program(object):
         logger.addHandler(logging.StreamHandler())
 
     def execute(self, namespace, log=True):
-        print(namespace)
         exec_command = self.COMMANDS.get(namespace.command)
         if exec_command is not None:
-            kwargs = vars(namespace)
             if log:
                 self.set_verbosity(namespace.verbose)
+                logger.debug('args namespace "%s"' % str(namespace))
+
+            kwargs = vars(namespace)
             del kwargs['command']
             del kwargs['verbose']
             getattr(self, exec_command)(**kwargs)
