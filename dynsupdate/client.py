@@ -391,7 +391,7 @@ class NameUpdate(object):
         dns.query.tcp(update, self.server, timeout=timeout, port=self.port)
 
     def update_a(self, domain, ip, resolver, ttl=DEFAULT_TTL, timeout=7):
-        old_ip = self.check_name(resolver, domain)
+        old_ip = self.check_name(domain, resolver)
         if ip != old_ip:
             updater = self.get_updater()
             updater.replace(domain.relativize(self.zone), ttl, 'A', ip)
@@ -424,12 +424,16 @@ class NameUpdate(object):
         return KeyConfigParser.parse_keys(data).get_key(keyname)
 
     @staticmethod
-    def determine_server(zone):
-        for rdata in dns.resolver.query(zone, 'SOA'):
+    def determine_server(zone, resolver=None):
+        if resolver is None:
+            resolver = dns.resolver.get_default_resolver()
+        for rdata in resolver.query(zone, 'SOA'):
             return rdata.mname.to_text()
 
     @staticmethod
-    def check_name(resolver, name):
+    def check_name(name, resolver=None):
+        if resolver is None:
+            resolver = dns.resolver.get_default_resolver()
         for rdata in resolver.query(name, 'A'):
             return rdata.address
 
