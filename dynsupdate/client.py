@@ -551,9 +551,9 @@ class Program(object):
         return parser
 
 
-def main():
+def main():  # pragma: no cover
     Program().run()
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()
