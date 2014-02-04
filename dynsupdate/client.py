@@ -407,7 +407,7 @@ class NameUpdate(object):
 
     @staticmethod
     def build_resolver(server, port=53):
-        for rdata in dns.resolver.query(server, 'A'):
+        for rdata in dns.resolver.query(server, 'A'):  # pragma: no branch
             new_resolver = dns.resolver.Resolver(configure=False)
             new_resolver.nameservers.append(rdata.address)
             new_resolver.port = port
