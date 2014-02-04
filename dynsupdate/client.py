@@ -388,10 +388,15 @@ class NameUpdate(object):
         return self.build_updater(self.zone, self.key)
 
     def send(self, update, timeout=7):
+        logger.info('send update message to server "%s",port %d, timeout %d',
+                    self.server, self.port, timeout)
         dns.query.tcp(update, self.server, timeout=timeout, port=self.port)
 
     def update_a(self, domain, ip, resolver, ttl=DEFAULT_TTL, timeout=7):
+        # FIXME: if domain not exists raise NXDOMAIN
         old_ip = self.check_name(domain, resolver)
+        logger.debug('domain "{0}" A: "{1}", new ip "{2}"'
+                     .format(domain.to_text(), old_ip, ip))
         if ip != old_ip:
             updater = self.get_updater()
             updater.replace(domain.relativize(self.zone), ttl, 'A', ip)
@@ -407,6 +412,7 @@ class NameUpdate(object):
 
     @staticmethod
     def build_resolver(server, port=53):
+        logger.debug('build resolver for server "%s"', server)
         for rdata in dns.resolver.query(server, 'A'):  # pragma: no branch
             new_resolver = dns.resolver.Resolver(configure=False)
             new_resolver.nameservers.append(rdata.address)
@@ -518,11 +524,15 @@ class Program(object):
         if zone is None:
             # could raise Timeout
             zone = dns.resolver.zone_for_name(name)
+            logger.info('determine zone by name: zone "{0}" name "{1}"'
+                        .format(zone.to_text(), name.to_text()))
         else:
             zone = dns.name.from_text(zone)
 
         if server is None:
             server = NameUpdate.determine_server(zone)
+            logger.info('determine server by zone: server "{0}" zone "{1}"'
+                        .format(server, zone.to_text()))
 
         try:
             ip = ip_fun()
