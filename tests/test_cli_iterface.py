@@ -82,20 +82,25 @@ class CliIterfaceTest(TestCase):
         self.response_soa_mock.mname.to_text.return_value = "master.server"
 
         def query_effect(name, type):
-            if name == "master.server" and type == "A":
+            master = dns.name.from_text('master.server')
+            check_name = dns.name.from_text('name.zone.com')
+            if isinstance(name, str):
+                name = dns.name.from_text(name)
+
+            if name == master and type == 'A':
                 yield dns.rdtypes.IN.A.A(1, 1, '127.0.0.2')
-            elif type == "A":
+            elif type == "A" and name == check_name:
                 yield dns.rdtypes.IN.A.A(1, 1, '127.0.0.1')
             elif type == "SOA":
                 yield self.response_soa_mock
-            raise ValueError("Bad arguments")
+            raise dns.resolver.NXDOMAIN("Bad arguments")
 
         def zone_for_name_effect(name):
             if isinstance(name, str):
                 name = dns.name.from_text(name)
-            cmp_name = dns.name.from_text('name.zone.com')
-            if name == cmp_name:
-                return dns.name.from_text("zone.com")
+            zone = dns.name.from_text('zone.com')
+            if name.is_subdomain(zone):
+                return zone
             raise ValueError("Bad arguments")
 
         self.resolver_mock.return_value.query.side_effect = query_effect
@@ -117,7 +122,7 @@ class CliIterfaceTest(TestCase):
         ret_value = self.stdout_mock.getvalue()
         self.assertIn('127.0.0.1', ret_value)
 
-    def test_interface_update(self, *args):
+    def test_interface_update(self):
         response_mock = mock.mock_open(read_data="127.0.0.6\n")
         self.urlopen_mock.side_effect = response_mock
         prog = client.Program()
@@ -135,3 +140,15 @@ class CliIterfaceTest(TestCase):
 
         self.assertIn("127.0.0.6", msg_text)
         self.assertIn("name", msg_text)
+
+    def test_interface_update2(self):
+        self.urlopen_mock.side_effect = mock.mock_open(read_data="127.0.0.7\n")
+        prog = client.Program()
+        prog.run("update -k keyname.key other.zone.com".split(), log=False)
+
+        args, kwargs = self.query_mock.call_args
+        updater = args[0]
+        msg_text = updater.to_text()
+        self.assertIn("other", msg_text)
+        self.assertIn("127.0.0.7", msg_text)
+        self.assertNotIn("name", msg_text)

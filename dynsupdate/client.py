@@ -393,16 +393,23 @@ class NameUpdate(object):
         dns.query.tcp(update, self.server, timeout=timeout, port=self.port)
 
     def update_a(self, domain, ip, resolver, ttl=DEFAULT_TTL, timeout=7):
-        # FIXME: if domain not exists raise NXDOMAIN
-        old_ip = self.check_name(domain, resolver)
-        logger.debug('domain "{0}" A: "{1}", new ip "{2}"'
-                     .format(domain.to_text(), old_ip, ip))
-        if ip != old_ip:
+        try:
+            old_ip = self.check_name(domain, resolver)
+        except dns.resolver.NXDOMAIN:
+            logger.debug('domain "{0!s}" not exists'.format(domain))
             updater = self.get_updater()
-            updater.replace(domain.relativize(self.zone), ttl, 'A', ip)
+            updater.add(domain.relativize(self.zone), ttl, 'A', ip)
             self.send(updater, timeout=timeout)
             return True
-        return False
+        else:
+            logger.debug('domain "{0}" A: "{1}", new ip "{2}"'
+                         .format(domain.to_text(), old_ip, ip))
+            if ip != old_ip:
+                updater = self.get_updater()
+                updater.replace(domain.relativize(self.zone), ttl, 'A', ip)
+                self.send(updater, timeout=timeout)
+                return True
+            return False
 
     @staticmethod
     def build_updater(zone, key):
@@ -440,6 +447,7 @@ class NameUpdate(object):
     def check_name(name, resolver=None):
         if resolver is None:
             resolver = dns.resolver.get_default_resolver()
+        logger.info('try resolve A record of {0!s}'.format(name))
         for rdata in resolver.query(name, 'A'):
             return rdata.address
 
