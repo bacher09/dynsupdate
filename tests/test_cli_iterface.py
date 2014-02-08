@@ -38,6 +38,20 @@ class CliParseTest(TestCase):
         self.assertRaises(argparse.ArgumentTypeError, positive_int, "-1")
         self.assertEqual(positive_int("0"), 0)
 
+        int_range = client.integer_range(min=3, max=6)
+        self.assertRaises(argparse.ArgumentTypeError, int_range, "7")
+        self.assertRaises(argparse.ArgumentTypeError, int_range, "2")
+        self.assertEqual(int_range("3"), 3)
+        self.assertEqual(int_range("6"), 6)
+        self.assertEqual(int_range("5"), 5)
+
+        float_range = client.integer_range(min=0.2, max=7.6, num_type=float)
+        self.assertRaises(argparse.ArgumentTypeError, float_range, "0")
+        self.assertRaises(argparse.ArgumentTypeError, float_range, "0.1")
+        self.assertRaises(argparse.ArgumentTypeError, float_range, "8")
+        self.assertRaises(argparse.ArgumentTypeError, float_range, "7.7")
+        self.assertEqual(float_range("0.3"), 0.3)
+
 
 class CliIterfaceTest(TestCase):
 
@@ -153,6 +167,12 @@ class CliIterfaceTest(TestCase):
 
         with self.assertRaises(ExitException):
             prog.run("checkip -n 0".split(), log=False)
+
+        with self.assertRaises(ExitException):
+            prog.run("checkip --timeout -1".split(), log=False)
+
+        with self.assertRaises(ExitException):
+            prog.run("checkip --timeout -0.1".split(), log=False)
 
     def test_interface_update(self):
         response_mock = mock.mock_open(read_data="127.0.0.6\n")

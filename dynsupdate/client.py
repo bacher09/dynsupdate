@@ -468,11 +468,11 @@ def comma_separated_list(values):
     return parse
 
 
-def integer_range(min=None, max=None):
+def integer_range(min=None, max=None, num_type=int):
 
     def validate_int(value):
         try:
-            res = int(value)
+            res = num_type(value)
         except ValueError:
             raise argparse.ArgumentTypeError('Invalid integer "%s"' % value)
         else:
@@ -583,6 +583,7 @@ class Program(object):
     @classmethod
     def ip_arguments(cls, parser):
         tries_type = integer_range(min=1)
+        timeout_type = integer_range(min=0, num_type=float)
         types_type = comma_separated_list(SimpleIpGetter.SERVICE_TYPES)
         services_type = comma_separated_list(SimpleIpGetter.SERVICE_NAMES)
         parser.add_argument('-n', '--tries', dest="tries", type=tries_type,
@@ -591,7 +592,8 @@ class Program(object):
                             default=None)
         parser.add_argument('--services', dest="services", type=services_type,
                             default=None)
-        parser.add_argument('--timeout', dest="timeout", type=float, default=5)
+        parser.add_argument('--timeout', dest="timeout", type=timeout_type,
+                            default=5)
 
     @classmethod
     def build_parser(cls):
