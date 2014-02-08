@@ -160,7 +160,6 @@ class CliIterfaceTest(TestCase):
 
     def test_interface_checkip_bad_num(self):
         self.urlopen_mock.side_effect = mock.mock_open(read_data="127.0.0.1\n")
-        self.assertEqual(argparse.ArgumentParser.exit, self.arg_exit_mock)
         prog = client.Program()
         with self.assertRaises(ExitException):
             prog.run("checkip -n -2".split(), log=False)
@@ -173,6 +172,15 @@ class CliIterfaceTest(TestCase):
 
         with self.assertRaises(ExitException):
             prog.run("checkip --timeout -0.1".split(), log=False)
+
+    def test_interface_checkip_bad_fetch(self):
+        self.urlopen_mock.side_effect = client.URLError("timeout")
+        prog = client.Program()
+
+        with self.assertRaises(ExitException):
+            prog.run("checkip".split(), log=False)
+
+        self.arg_exit_mock.assert_called_with(69, mock.ANY)
 
     def test_interface_update(self):
         response_mock = mock.mock_open(read_data="127.0.0.6\n")

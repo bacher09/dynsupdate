@@ -129,11 +129,13 @@ class SimpleIpGetter(object):
                 del next_array[el]
 
     def get(self, tries=DEFAULT_TRIES, timeout=DEFAULT_TIMEOUT):
+        logger.debug('try determine ip address')
         for service in self.iter_rand_service(tries):
             res = self.query_service(service, timeout=timeout)
             if res is not None:
                 return res
 
+        logger.debug('can\'t determine ip address')
         raise IpFetchError("Can't fetch ip address")
 
     @staticmethod
@@ -544,7 +546,10 @@ class Program(object):
 
     def checkip_command(self, *args, **kwargs):
         ip_fun = self.ip_fun(*args, **kwargs)
-        print(ip_fun())
+        try:
+            print(ip_fun())
+        except IpFetchError as e:
+            self.service_error(e.message)
 
     def update_command(self, name, keyfile, keyname, zone=None, server=None,
                        tries=5, timeout=5, types=None, services=None,
@@ -574,6 +579,9 @@ class Program(object):
             resolver = NameUpdate.build_resolver(server)
             nu = NameUpdate(server, zone, keyfile, keyname=keyname)
             nu.update_a(name, ip, resolver, ttl)
+
+    def service_error(self, message):
+        self.parser.exit(69, message + '\n')
 
     @classmethod
     def ip_fun(cls, tries=5, timeout=5, types=None, services=None):
