@@ -51,7 +51,7 @@ class DetectIpTests(TestCase):
         self.assertRaises(ValueError, self.ip_get.query_service, 'bad')
 
     def test_bad_create_ip_getter(self):
-        self.assertRaises(ValueError, client.SimpleIpGetter, [])
+        self.assertRaises(ValueError, client.SimpleIpGetter, iter([]))
 
     @mock.patch('dynsupdate.client.urlopen', spec=client.urlopen)
     def test_network_issues(self, urlopen_mock):

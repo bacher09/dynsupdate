@@ -182,6 +182,14 @@ class CliIterfaceTest(TestCase):
 
         self.arg_exit_mock.assert_called_with(69, mock.ANY)
 
+    def test_interface_checkip_bad_services(self):
+        prog = client.Program()
+
+        with self.assertRaises(ExitException):
+            prog.run("checkip -t https --services curlmyip".split(), log=False)
+
+        self.assertTrue(self.arg_error_mock.called)
+
     def test_interface_update(self):
         response_mock = mock.mock_open(read_data="127.0.0.6\n")
         self.urlopen_mock.side_effect = response_mock

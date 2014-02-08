@@ -93,12 +93,13 @@ class SimpleIpGetter(object):
 
     def __init__(self, services):
         self.services = {}
-        if not services:
-            raise ValueError("At least one service should exist")
 
         for service in services:
             name = service[0]
             self.services[name] = service[1:]
+
+        if not self.services:
+            raise ValueError("At least one service should exist")
 
         self.service_names = tuple(self.services.keys())
 
@@ -549,7 +550,7 @@ class Program(object):
         try:
             print(ip_fun())
         except IpFetchError as e:
-            self.service_error(e.message)
+            self.service_error(str(e))
 
     def update_command(self, name, keyfile, keyname, zone=None, server=None,
                        tries=5, timeout=5, types=None, services=None,
@@ -583,9 +584,11 @@ class Program(object):
     def service_error(self, message):
         self.parser.exit(69, message + '\n')
 
-    @classmethod
-    def ip_fun(cls, tries=5, timeout=5, types=None, services=None):
-        ip_get = SimpleIpGetter.create_new_ip_getter(types, services)
+    def ip_fun(self, tries=5, timeout=5, types=None, services=None):
+        try:
+            ip_get = SimpleIpGetter.create_new_ip_getter(types, services)
+        except ValueError as e:
+            self.parser.error(str(e))
         return partial(ip_get.get, tries=tries, timeout=timeout)
 
     @classmethod
