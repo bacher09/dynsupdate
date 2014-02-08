@@ -15,6 +15,10 @@ key "test" {
 """
 
 
+class ExitException(Exception):
+    pass
+
+
 class CliParseTest(TestCase):
 
     def test_comma_separated_list(self):
@@ -26,6 +30,13 @@ class CliParseTest(TestCase):
 
         self.assertRaises(argparse.ArgumentTypeError, my_types, "http,bad")
         # TODO: Maybe tests arguments in uppercase to
+
+    def test_validate_int(self):
+        positive_int = client.integer_range(min=0)
+        self.assertRaises(argparse.ArgumentTypeError, positive_int, "bad")
+        self.assertRaises(argparse.ArgumentTypeError, positive_int, "-2")
+        self.assertRaises(argparse.ArgumentTypeError, positive_int, "-1")
+        self.assertEqual(positive_int("0"), 0)
 
 
 class CliIterfaceTest(TestCase):
@@ -50,6 +61,17 @@ class CliIterfaceTest(TestCase):
         self.addCleanup(urlopen_patch.stop)
 
     def patch_argparse(self):
+        self.arg_exit_mock = mock.Mock(spec=[])
+        self.arg_error_mock = mock.Mock(spec=[])
+        self.arg_exit_mock.side_effect = ExitException
+        self.arg_error_mock.side_effect = ExitException
+        argparse_patch = mock.patch.multiple(
+            'argparse.ArgumentParser',
+            exit=self.arg_exit_mock,
+            error=self.arg_error_mock
+        )
+        argparse_patch.start()
+        self.addCleanup(argparse_patch.stop)
 
         filetype_patch = mock.patch('argparse.FileType')
         self.filetype_mock = filetype_patch.start()
@@ -121,6 +143,16 @@ class CliIterfaceTest(TestCase):
         prog.run("checkip".split(), log=False)
         ret_value = self.stdout_mock.getvalue()
         self.assertIn('127.0.0.1', ret_value)
+
+    def test_interface_checkip_bad_num(self):
+        self.urlopen_mock.side_effect = mock.mock_open(read_data="127.0.0.1\n")
+        self.assertEqual(argparse.ArgumentParser.exit, self.arg_exit_mock)
+        prog = client.Program()
+        with self.assertRaises(ExitException):
+            prog.run("checkip -n -2".split(), log=False)
+
+        with self.assertRaises(ExitException):
+            prog.run("checkip -n 0".split(), log=False)
 
     def test_interface_update(self):
         response_mock = mock.mock_open(read_data="127.0.0.6\n")

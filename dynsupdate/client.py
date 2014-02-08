@@ -72,7 +72,7 @@ def simple_ip_fetch(url, extract_fun=lambda x: x.strip(), timeout=5):
             # Limit response size
             data = resp.read(MAX_RESPONSE_DATA)
     except (URLError, socket.error) as e:
-        logger.warn('couldn\'t fetch url "{0}" with timeout {1:d}'
+        logger.warn('couldn\'t fetch url "{0}" with timeout {1:.4g}'
                     .format(url, timeout))
         return None
     else:
@@ -468,6 +468,30 @@ def comma_separated_list(values):
     return parse
 
 
+def integer_range(min=None, max=None):
+
+    def validate_int(value):
+        try:
+            res = int(value)
+        except ValueError:
+            raise argparse.ArgumentTypeError('Invalid integer "%s"' % value)
+        else:
+            if min is not None and res < min:
+                raise argparse.ArgumentTypeError(
+                    'Value "{val}" is smaller than "{min}"'
+                    .format(val=res, min=min)
+                )
+            elif max is not None and res > max:
+                raise argparse.ArgumentTypeError(
+                    'Value "{val}" is bigger than "{max}"'
+                    .format(val=res, max=min)
+                )
+
+            return res
+
+    return validate_int
+
+
 class Program(object):
 
     COMMANDS = {
@@ -558,14 +582,16 @@ class Program(object):
 
     @classmethod
     def ip_arguments(cls, parser):
+        tries_type = integer_range(min=1)
         types_type = comma_separated_list(SimpleIpGetter.SERVICE_TYPES)
         services_type = comma_separated_list(SimpleIpGetter.SERVICE_NAMES)
-        parser.add_argument('-n', '--tries', dest="tries", type=int, default=5)
+        parser.add_argument('-n', '--tries', dest="tries", type=tries_type,
+                            default=5)
         parser.add_argument('-t', '--types', dest="types", type=types_type,
                             default=None)
         parser.add_argument('--services', dest="services", type=services_type,
                             default=None)
-        parser.add_argument('--timeout', dest="timeout", type=int, default=5)
+        parser.add_argument('--timeout', dest="timeout", type=float, default=5)
 
     @classmethod
     def build_parser(cls):
