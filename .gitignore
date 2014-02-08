@@ -6,3 +6,4 @@ venv/
 .coverage
 nosetests.xml
 cover/
+*.key
