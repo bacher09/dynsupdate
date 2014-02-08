@@ -220,3 +220,22 @@ class CliIterfaceTest(TestCase):
         self.assertIn("other", msg_text)
         self.assertIn("127.0.0.7", msg_text)
         self.assertNotIn("name", msg_text)
+
+    @mock.patch('dynsupdate.client.Program.checkip_command')
+    @mock.patch('dynsupdate.client.logger', spec=logging.Logger)
+    def test_interface_set_verbosity(self, logger_mock, checkip_mock):
+        logger_mock.configure_mock(handlers=[])
+        prog = client.Program()
+        prog.run("-vvv checkip".split(), log=True)
+
+        logger_mock.setLevel.assert_called_with(logging.DEBUG)
+        logger_mock.addHandler.assert_called_with(mock.ANY)
+
+        prog.run("-vv checkip".split(), log=True)
+        logger_mock.setLevel.assert_called_with(logging.INFO)
+
+        prog.run("-v checkip".split(), log=True)
+        logger_mock.setLevel.assert_called_with(logging.WARNING)
+
+        prog.run("-vvvvv checkip".split(), log=True)
+        logger_mock.setLevel.assert_called_with(logging.DEBUG)
