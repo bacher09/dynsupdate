@@ -49,7 +49,8 @@ HTTP_IP_SERVICES = (
     ('http:ip.appspot.com', 'http://ip.appspot.com'),
     ('http:ipinfo', 'http://ipinfo.io/ip'),
     ('http:externalip', 'http://api.externalip.net/ip'),
-    ('http:trackip', 'http://www.trackip.net/ip')
+    ('http:trackip', 'http://www.trackip.net/ip'),
+    ('http:ipz', 'http://ipz.herokuapp.com/')
 )
 
 
