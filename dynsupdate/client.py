@@ -191,10 +191,6 @@ class ParseError(Exception):
     pass
 
 
-class NoKeysError(Exception):
-    pass
-
-
 KeyData = namedtuple("KeyData", ["name", "algorithm", "key"])
 
 
@@ -281,6 +277,10 @@ class KeyConfigParser(object):
         self.keys[key_name] = key
         self.keys_names.append(key_name)
 
+    def get_eof(self):
+        if self.state is not None or len(self.keys_names) == 0:
+            raise ParseError("Bad keyfile")
+
     @property
     def state(self):
         if not self.states:
@@ -294,9 +294,6 @@ class KeyConfigParser(object):
         self.states.append(val)
 
     def get_key(self, key_name=None):
-        if not self.keys_names:
-            raise NoKeysError("No keys")
-
         if key_name is None:
             key_name = self.keys_names[0]
 
@@ -369,6 +366,9 @@ class KeyConfig(object):
                 raise BadToken('Uknown token "{0}"'.format(token_id))
 
             getattr(parser, method)(m)
+
+        # end of file reached
+        parser.get_eof()
 
     @staticmethod
     def get_keyring(key_name, key_data):
@@ -553,6 +553,16 @@ class Program(object):
         except IpFetchError as e:
             self.service_error(str(e))
 
+    def get_key(self, keyfile, keyname=None):
+        try:
+            key = NameUpdate.key_from_file(keyfile, keyname)
+        except ParseError:
+            self.parser.error("Bad key format")
+        except KeyError:
+            self.parser.error("Bad key name")
+        else:
+            return key
+
     def update_command(self, name, keyfile, keyname, zone=None, server=None,
                        tries=5, timeout=5, types=None, services=None,
                        ttl=NameUpdate.DEFAULT_TTL, **kwargs):
@@ -560,6 +570,8 @@ class Program(object):
                              services=services)
 
         name = dns.name.from_text(name)
+        key = self.get_key(keyfile, keyname)
+
         if zone is None:
             # could raise Timeout
             zone = dns.resolver.zone_for_name(name)
@@ -579,7 +591,7 @@ class Program(object):
             pass
         else:
             resolver = NameUpdate.build_resolver(server)
-            nu = NameUpdate(server, zone, keyfile, keyname=keyname)
+            nu = NameUpdate(server, zone, key=key)
             nu.update_a(name, ip, resolver, ttl)
 
     def service_error(self, message):

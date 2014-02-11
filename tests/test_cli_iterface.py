@@ -15,6 +15,9 @@ key "test" {
 """
 
 
+BAD_KEY = "Bad data"
+
+
 class ExitException(Exception):
     pass
 
@@ -91,11 +94,18 @@ class CliIterfaceTest(TestCase):
         self.filetype_mock = filetype_patch.start()
         self.addCleanup(filetype_patch.stop)
         self.keyfile_mock_factory = mock.mock_open(read_data=KEY_TEXT)
+        badkeyfile_factory = mock.mock_open(read_data=BAD_KEY)
+        empty_factory = mock.mock_open(read_data="")
 
         def keyfile_sideeffect(filename):
             if filename == "keyname.key":
                 return self.keyfile_mock_factory()
-            raise IOError()
+            elif filename == "badkey.key":
+                return badkeyfile_factory()
+            elif filename == "empty.key":
+                return empty_factory()
+            else:
+                raise ValueError()
 
         self.filetype_mock.return_value.side_effect = keyfile_sideeffect
 
@@ -220,6 +230,21 @@ class CliIterfaceTest(TestCase):
         self.assertIn("other", msg_text)
         self.assertIn("127.0.0.7", msg_text)
         self.assertNotIn("name", msg_text)
+
+    def test_interface_update_bad_key(self):
+        self.urlopen_mock.side_effect = mock.mock_open(read_data="127.0.0.7\n")
+        prog = client.Program()
+        with self.assertRaises(ExitException):
+            prog.run("update -k badkey.key other.zone.com".split(), log=False)
+
+        with self.assertRaises(ExitException):
+            prog.run(
+                "update -k keyname.key --keyname bad other.zone.com".split(),
+                log=False
+            )
+
+        with self.assertRaises(ExitException):
+            prog.run("update -k empty.key other.zone.com".split(), log=False)
 
     @mock.patch('dynsupdate.client.Program.checkip_command')
     @mock.patch('dynsupdate.client.logger', spec=logging.Logger)
