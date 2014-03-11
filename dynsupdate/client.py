@@ -9,6 +9,7 @@ from collections import namedtuple
 from functools import partial
 import dns.resolver
 import dns.update
+import dns.exception
 import dns.tsigkeyring
 import dns.query
 
@@ -573,8 +574,7 @@ class Program(object):
         key = self.get_key(keyfile, keyname)
 
         if zone is None:
-            # could raise Timeout
-            zone = dns.resolver.zone_for_name(name)
+            zone = self.determine_zone(name)
             logger.info('determine zone by name: zone "{0}" name "{1}"'
                         .format(zone.to_text(), name.to_text()))
         else:
@@ -587,12 +587,21 @@ class Program(object):
 
         try:
             ip = ip_fun()
-        except IpFetchError:
-            pass
+        except IpFetchError as e:
+            self.service_error(str(e))
         else:
-            resolver = NameUpdate.build_resolver(server)
-            nu = NameUpdate(server, zone, key=key)
-            nu.update_a(name, ip, resolver, ttl)
+            try:
+                resolver = NameUpdate.build_resolver(server)
+                nu = NameUpdate(server, zone, key=key)
+                nu.update_a(name, ip, resolver, ttl)
+            except dns.exception.Timeout:
+                self.service_error("Timeout when sending dns query")
+
+    def determine_zone(self, name):
+        try:
+            return dns.resolver.zone_for_name(name)
+        except dns.exception.Timeout:
+            self.service_error("Could not determine zone name")
 
     def service_error(self, message):
         self.parser.exit(69, message + '\n')

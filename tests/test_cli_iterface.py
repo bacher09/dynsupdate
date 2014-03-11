@@ -3,6 +3,7 @@ from dynsupdate import client
 import dns.rdtypes.IN.A
 import dns.resolver
 import dns.name
+import dns.exception
 import argparse
 import logging
 
@@ -245,6 +246,25 @@ class CliIterfaceTest(TestCase):
 
         with self.assertRaises(ExitException):
             prog.run("update -k empty.key other.zone.com".split(), log=False)
+
+    def test_interface_update_timeout(self):
+        self.urlopen_mock.side_effect = mock.mock_open(read_data="127.0.0.7\n")
+        self.resolver_mock.return_value.query \
+            .side_effect = dns.exception.Timeout
+        prog = client.Program()
+        with self.assertRaises(ExitException):
+            prog.run("update -k keyname.key test.zone.com".split(), log=False)
+
+        self.zone_for_name_mock.side_effect = dns.exception.Timeout
+
+        with self.assertRaises(ExitException):
+            prog.run("update -k keyname.key test.zone.com".split(), log=False)
+
+    def test_interface_update_bad_fetch(self):
+        self.urlopen_mock.side_effect = client.URLError("timeout")
+        prog = client.Program()
+        with self.assertRaises(ExitException):
+            prog.run("update -k keyname.key test.zone.com".split(), log=False)
 
     @mock.patch('dynsupdate.client.Program.checkip_command')
     @mock.patch('dynsupdate.client.logger', spec=logging.Logger)
