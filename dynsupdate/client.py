@@ -67,6 +67,19 @@ def validate_ipv4(ip_text):
         return True
 
 
+def validate_ipv6(ip_text):
+    try:
+        socket.inet_pton(socket.AF_INET6, ip_text)
+    except socket.error:
+        return False
+    else:
+        return True
+
+
+def validate_ipv46(ip_text):
+    return validate_ipv4(ip_text) or validate_ipv6(ip_text)
+
+
 def simple_ip_fetch(url, extract_fun=lambda x: x.strip(), timeout=5):
     logger.debug('fetching url "{0}"'.format(url))
     try:
@@ -423,13 +436,20 @@ class NameUpdate(object):
                                  keyalgorithm=key.algorithm)
 
     @staticmethod
-    def build_resolver(server, port=53):
+    def build_resolver_by_ip(server_ip, port=53):
+        new_resolver = dns.resolver.Resolver(configure=False)
+        new_resolver.nameservers.append(server_ip)
+        new_resolver.port = port
+        return new_resolver
+
+    @classmethod
+    def build_resolver(cls, server, port=53):
         logger.debug('build resolver for server "%s"', server)
+        if validate_ipv46(server):
+            return cls.build_resolver_by_ip(server, port)
+
         for rdata in dns.resolver.query(server, 'A'):  # pragma: no branch
-            new_resolver = dns.resolver.Resolver(configure=False)
-            new_resolver.nameservers.append(rdata.address)
-            new_resolver.port = port
-            return new_resolver
+            return cls.build_resolver_by_ip(rdata.address, port)
 
     @staticmethod
     def key_from_file(filename, keyname=None):

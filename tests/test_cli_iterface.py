@@ -266,6 +266,15 @@ class CliIterfaceTest(TestCase):
         with self.assertRaises(ExitException):
             prog.run("update -k keyname.key test.zone.com".split(), log=False)
 
+    def test_interface_update_query_by_ip(self):
+        self.urlopen_mock.side_effect = mock.mock_open(read_data="127.0.0.7\n")
+        prog = client.Program()
+        prog.run("update -k keyname.key -s 8.8.8.8 other.zone.com".split(),
+            log=False)
+        args, kwargs = self.query_mock.call_args
+        server = args[1]
+        self.assertEqual(server, "8.8.8.8")
+
     @mock.patch('dynsupdate.client.Program.checkip_command')
     @mock.patch('dynsupdate.client.logger', spec=logging.Logger)
     def test_interface_set_verbosity(self, logger_mock, checkip_mock):
