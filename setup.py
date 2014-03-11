@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from setuptools import setup, find_packages
+import os.path
 import sys
 
 
@@ -21,6 +22,11 @@ def lt33():
     return (v[0], v[1]) < (3, 3)
 
 
+ROOT_PATH = os.path.dirname(__file__)
+with open(os.path.join(ROOT_PATH, "README.rst")) as f:
+    long_description = f.read()
+
+
 tests_require = [
     'nose>=1.0',
     'coverage'
@@ -39,6 +45,7 @@ if lt27():
 setup(
     name='dynsupdate',
     description='Dynamic DNS update like nsupdate',
+    long_description=long_description,
     install_requires=install_packages,
     tests_require=tests_require,
     packages=find_packages(),
@@ -67,5 +74,6 @@ setup(
     license="BSD",
     author='Slava Bacherikov',
     author_email='slava@bacherikov.org.ua',
+    keywords=["ddns", "dns"],
     version="0.1a"
 )
